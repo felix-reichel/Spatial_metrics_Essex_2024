@@ -8,13 +8,13 @@ n <- 100  # Number of neighborhoods
 
 coords <- matrix(runif(n * 2, 0, 10), ncol = 2)
 
-city_coords <- rbind(
+cluster_coords <- rbind(
   cbind(runif(20, 2, 3), runif(20, 2, 3)),
   cbind(runif(20, 6, 7), runif(20, 6, 7)),
   cbind(runif(20, 8, 9), runif(20, 2, 3))
 )
 
-coords <- rbind(coords[-(1:60), ], city_coords)
+coords <- rbind(coords[-(1:60), ], cluster_coords)
 
 # Create spatial weight matrix
 nb <- dnearneigh(coords, 0, 2)  # Neighbors within distance of 2 units
@@ -26,9 +26,9 @@ beta <- c(100000, 2, 3)
 median_income <- rnorm(n, mean = 40000, sd = 10000)
 population_density <- rnorm(n, mean = 3000, sd = 500)
 
-city_indices <- (n - 59):n
-median_income[city_indices] <- rnorm(60, mean = 50000, sd = 12000)
-population_density[city_indices] <- rnorm(60, mean = 12000, sd = 300)
+cluster_indices <- (n - 59):n
+median_income[cluster_indices] <- rnorm(60, mean = 50000, sd = 12000)
+population_density[cluster_indices] <- rnorm(60, mean = 12000, sd = 300)
 
 X <- cbind(1, median_income, population_density)
 
@@ -45,7 +45,7 @@ for (rho in rho_values) {
   epsilon <- solve(I - rho * W_matrix) %*% e
   
   housing_prices <- as.vector(X %*% beta + epsilon)
-  housing_prices[city_indices] <- housing_prices[city_indices] + 150000
+  housing_prices[cluster_indices] <- housing_prices[cluster_indices] + 150000
   
   data <- data.frame(housing_prices, median_income, population_density)
 
@@ -77,7 +77,6 @@ for (rho in rho_values) {
   }
 }
 
-
 ggplot(results, aes(x = factor(rho), y = estimate, color = model)) +
   geom_line(aes(group = interaction(term, model)), size = 1) +
   geom_point(size = 1) +
@@ -88,15 +87,16 @@ ggplot(results, aes(x = factor(rho), y = estimate, color = model)) +
   theme_minimal() +
   theme(legend.position = "bottom")
 
-city_labels <- rep("Other", n)
-city_labels[city_indices] <- rep(c("City 1", "City 2", "City 3"), each = 20)
+cluster_labels <- rep("Other", n)
+cluster_labels[cluster_indices] <- rep(c("Cluster 1", "Cluster 2", "Cluster 3"), each = 20)
 
-coords_df <- data.frame(coords, city = city_labels)
-colnames(coords_df) <- c("x", "y", "city")
+coords_df <- data.frame(coords, cluster = cluster_labels)
+colnames(coords_df) <- c("x", "y", "cluster")
 
-ggplot(coords_df, aes(x = x, y = y, color = city)) +
+ggplot(coords_df, aes(x = x, y = y, color = cluster)) +
   geom_point(size = 1) +
-  scale_color_manual(values = c("Other" = "grey", "City 1" = "red", "City 2" = "blue", "City 3" = "green")) +
-  labs(title = "City Map with Neighborhoods",
+  scale_color_manual(values = c("Other" = "grey", "Cluster 1" = "red", "Cluster 2" = "blue", "Cluster 3" = "green")) +
+  labs(title = "Cluster Map with Neighborhoods",
        x = "X Coordinate", y = "Y Coordinate") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "bottom")
