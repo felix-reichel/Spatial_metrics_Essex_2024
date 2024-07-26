@@ -1,14 +1,14 @@
 # 3 practicals ----
 
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-rm(list = ls())
 
+rm(list = ls())
 library(cshapes)
 library(countrycode)
 library(haven)
 library(spdep)
 library(sf)
 library(tidyverse)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 ## 3.1 ----
 ### load Brexit_chippy.RData (Breixt_chippy — data, sf_GBR — simple features, 
