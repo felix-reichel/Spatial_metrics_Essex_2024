@@ -3,6 +3,7 @@ library(sf)
 library(spdep)
 library(haven)
 library(spatialreg)
+library(fourPNO)
 
 # Info: input data has to be placed at the same level as source file.
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -90,7 +91,7 @@ moran_plot <- moran.plot(as.vector(oxford_data$ben95_z), listw, main = "Moran's 
 
 # Q. 3
 
-## 3.1.
+## Q. 3.1.
 lm_tests <- lm.LMtests(lm(ben95 ~ rskpovpc + wage95 + instcoad + ipcfold + teitrend + match, data = oxford_data), listw)
 
 print(lm_tests)
@@ -119,13 +120,13 @@ lm_tests
 # Robust Tests
 # adjRSerr = 0.71624, df = 1, p-value = 0.3974 => Insignificant => not SAC
 # adjRSlag = 6.4774, df = 1, p-value = 0.01093 => Significant => SAR, 
-      #  because the robust LM-Lag test stays significant and would be sufficient.
+#  because the robust LM-Lag test stays significant and would be sufficient.
 
 # SARMA = 12.322, df = 2, p-value = 0.00211
 
 
 
-## 3.2.
+## Q. 3.2.
 hist(oxford_data$ben95)
 
 # Fit a SAC
@@ -137,7 +138,7 @@ effect_ideology <- impacts(sac_model, listw = listw, R = 1000) # 1000 monte carl
 effect_ideology
 
 # Impact measures (sac, exact):
-# Direct     Indirect        Total
+#               Direct     Indirect        Total
 # rskpovpc   5.13409572    8.8007929    13.9348887
 # wage95     0.05935024    0.1017373    0.1610876
 # instcoad   1.50169572    2.5741852    4.0758809
@@ -147,19 +148,65 @@ effect_ideology
 
 
 
-## 3.3.
-illinois_idx <- which(states == "IL")
-neighbor_indices <- which(weights_matrix[illinois_idx, ] != 0)
-neighbor_states <- states[neighbor_indices]
-neighbor_impacts <- effect_ideology$direct[illinois_idx, ] 
-+ effect_ideology$indirect[neighbor_indices, ]
+## Q.  3.3.
+W <- oxford_w / rowSums(oxford_w) # row standardizes weights
 
-illinois_idx
-neighbor_indices
-neighbor_states
-neighbor_impacts
+N <- nrow(W)
+
+I <- diag(as.matrix(W)) # 48 zeros (neighbours contig.)
+
+rho <- sac_model$rho
+
+M <- solve(I - rho * W) # calc spatial multiplier
 
 
+# instcoad effects
+direct_effect <- sum(diag(M * coef(sac_model)["instcoad"])) / N
+# 1.824513
+
+indirect_effect <- mean(rowSums(M * coef(sac_model)["instcoad"]) - diag(M * coef(sac_model)["instcoad"]))
+# -3.637528
+
+total_effect <- mean(rowSums(M * coef(sac_model)["instcoad"]))
+# -1.813015
+
+
+
+# Neighboring Impact Effects
+illinois_row <- which(oxford_data$statenm == "IL")
+
+# Simulate impacts
+nSims <- 1000
+set.seed(08142024)
+coef <- coef(sac_model)
+vcov <- vcov(sac_model)
+coefs <- rmvnorm(n = nSims, coef, vcov)
+
+neighbor_indices <- which(oxford_w[illinois_row, ] != 0)
+
+neighbor_states <- oxford_data$statenm[neighbor_indices]
+# 5 neighbor_states: WI = Wisconsin, IA = Iowa, KY = Kentucky, IN = Indiana, MO = Missouri, Michigan -> Lake -> doesn't count
+
+
+eff_from_IL <- matrix(
+  data = NA,
+  nrow = length(neighbor_indices),
+  ncol = nSims,
+  dimnames = list(neighbor_states, NULL)
+)
+
+for (i in 1:nSims) {
+  eff_from_IL[, i] <- 
+    coefs[i, 6] * solve(I - coefs[i, 1] * W)[neighbor_indices, illinois_row]     # rho is at idx 1, instcoad is at idx 6.
+}
+
+
+eff_summary <- apply(eff_from_IL, 
+                     MARGIN = 1, 
+                     quantile, 
+                     c(0.05, 0.50, 0.95)) %>% t(.)
+
+print(eff_summary)
 
 
 
